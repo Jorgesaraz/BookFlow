@@ -1,0 +1,13 @@
+{
+  "name": "bookflow",
+  "version": "1.0.0",
+  "description": "Plataforma e-commerce full-stack de libros BookFlow",
+  "scripts": {
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "install:all": "npm --prefix server install; npm --prefix client install"
+  },
+  "keywords": ["ecommerce", "bookflow", "nextjs", "express", "mongodb", "socketio", "paypal"],
+  "author": "",
+  "license": "ISC"
+}
