@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, Eye, CheckCircle2, AlertCircle, BookOpen } from 'lucide-react';
+import { ShoppingCart, Eye, CheckCircle2, AlertCircle, BookOpen, Check, Loader2 } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 export interface BookItem {
   _id: string;
@@ -23,12 +24,27 @@ interface BookCardProps {
 
 export default function BookCard({ book, onAddToCartToast }: BookCardProps) {
   const [imageError, setImageError] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
+
+  const { addToCart } = useCart();
   const isOutOfStock = !book.availability || book.stock === 0;
 
-  const handleAdd = () => {
-    if (isOutOfStock) return;
-    if (onAddToCartToast) {
-      onAddToCartToast(book.title);
+  const handleAdd = async () => {
+    if (isOutOfStock || isAdding) return;
+
+    setIsAdding(true);
+    const result = await addToCart(book._id, 1);
+    setIsAdding(false);
+
+    if (result.success) {
+      setIsAdded(true);
+      setTimeout(() => setIsAdded(false), 2000);
+      if (onAddToCartToast) {
+        onAddToCartToast(book.title);
+      }
+    } else if (result.message && onAddToCartToast) {
+      onAddToCartToast(result.message);
     }
   };
 
@@ -104,15 +120,31 @@ export default function BookCard({ book, onAddToCartToast }: BookCardProps) {
 
           <button
             onClick={handleAdd}
-            disabled={isOutOfStock}
+            disabled={isOutOfStock || isAdding}
             className={`inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition shadow-sm ${
               isOutOfStock
                 ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                : isAdded
+                ? 'bg-emerald-600 text-white shadow'
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20 hover:shadow'
             }`}
           >
-            <ShoppingCart className="w-4 h-4" />
-            <span>{isOutOfStock ? 'Sin stock' : 'Agregar'}</span>
+            {isAdding ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Agregando...</span>
+              </>
+            ) : isAdded ? (
+              <>
+                <Check className="w-4 h-4" />
+                <span>¡Agregado!</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="w-4 h-4" />
+                <span>{isOutOfStock ? 'Sin stock' : 'Agregar'}</span>
+              </>
+            )}
           </button>
         </div>
       </div>

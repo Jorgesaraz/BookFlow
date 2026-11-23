@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '../../../lib/api';
 import { useSocket } from '../../../context/SocketContext';
+import { useCart } from '../../../context/CartContext';
 import {
   ArrowLeft,
   ShoppingCart,
@@ -14,7 +15,9 @@ import {
   ShieldCheck,
   Zap,
   Download,
-  X
+  X,
+  Loader2,
+  Check
 } from 'lucide-react';
 
 interface BookDetail {
@@ -40,8 +43,11 @@ export default function BookDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [isAdded, setIsAdded] = useState(false);
 
   const { socket } = useSocket();
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -90,10 +96,22 @@ export default function BookDetailPage() {
     };
   }, [socket, id]);
 
-  const handleAddToCart = () => {
-    if (!book || !book.availability || book.stock === 0) return;
-    setToastMessage(`"${book.title}" seleccionado. El carrito de compras se conectará en la Fase 5.`);
-    setTimeout(() => setToastMessage(null), 4000);
+  const handleAddToCart = async () => {
+    if (!book || !book.availability || book.stock === 0 || isAdding) return;
+
+    setIsAdding(true);
+    const result = await addToCart(book._id, 1);
+    setIsAdding(false);
+
+    if (result.success) {
+      setIsAdded(true);
+      setTimeout(() => setIsAdded(false), 2500);
+      setToastMessage(`¡"${book.title}" agregado exitosamente al carrito!`);
+      setTimeout(() => setToastMessage(null), 3500);
+    } else if (result.message) {
+      setToastMessage(result.message);
+      setTimeout(() => setToastMessage(null), 4000);
+    }
   };
 
   if (loading) {
@@ -275,17 +293,33 @@ export default function BookDetailPage() {
               <div className="pt-4 space-y-3">
                 <button
                   onClick={handleAddToCart}
-                  disabled={isOutOfStock}
+                  disabled={isOutOfStock || isAdding}
                   className={`w-full py-4 px-6 rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition shadow-lg ${
                     isOutOfStock
                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                      : isAdded
+                      ? 'bg-emerald-600 text-white shadow-emerald-500/25'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/25 hover:shadow-indigo-500/40 active:scale-[0.99]'
                   }`}
                 >
-                  <ShoppingCart className="w-5 h-5" />
-                  <span>
-                    {isOutOfStock ? 'Producto Agotado' : 'Agregar al Carrito de Compras'}
-                  </span>
+                  {isAdding ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Agregando al carrito...</span>
+                    </>
+                  ) : isAdded ? (
+                    <>
+                      <Check className="w-5 h-5" />
+                      <span>¡Agregado al Carrito!</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-5 h-5" />
+                      <span>
+                        {isOutOfStock ? 'Producto Agotado' : 'Agregar al Carrito de Compras'}
+                      </span>
+                    </>
+                  )}
                 </button>
 
                 <p className="text-[11px] text-center text-slate-400">

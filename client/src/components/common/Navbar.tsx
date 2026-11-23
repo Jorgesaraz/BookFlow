@@ -3,10 +3,19 @@
 import React from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/AuthContext';
-import { BookOpen, LogOut, ShieldCheck, User as UserIcon, KanbanSquare } from 'lucide-react';
+import { useCart } from '../../context/CartContext';
+import {
+  BookOpen,
+  LogOut,
+  ShieldCheck,
+  User as UserIcon,
+  KanbanSquare,
+  ShoppingCart
+} from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { totalItems } = useCart();
 
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
@@ -26,7 +35,7 @@ export default function Navbar() {
           </Link>
 
           {/* Navegación y Estado de Autenticación */}
-          <nav className="flex items-center gap-4 sm:gap-6">
+          <nav className="flex items-center gap-3 sm:gap-5">
             
             {!user ? (
               /* Estado 1: Sin sesión */
@@ -47,7 +56,7 @@ export default function Navbar() {
             ) : user.role === 'ADMIN' ? (
               /* Estado 2: Rol ADMIN */
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="hidden md:flex items-center gap-2">
+                <div className="hidden lg:flex items-center gap-2">
                   <span className="text-xs sm:text-sm font-bold text-slate-800">
                     {user.name}
                   </span>
@@ -62,7 +71,7 @@ export default function Navbar() {
                   className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl border border-indigo-200/60 transition"
                 >
                   <BookOpen className="w-4 h-4" />
-                  <span>Gestionar Catálogo</span>
+                  <span className="hidden sm:inline">Gestionar Catálogo</span>
                 </Link>
 
                 <Link
@@ -70,7 +79,22 @@ export default function Navbar() {
                   className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition"
                 >
                   <KanbanSquare className="w-4 h-4" />
-                  <span>Tablero Kanban</span>
+                  <span className="hidden sm:inline">Tablero Kanban</span>
+                </Link>
+
+                {/* Enlace Carrito con Badge */}
+                <Link
+                  href="/cart"
+                  className="relative inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition"
+                  title="Carrito de compras"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="hidden sm:inline">Carrito</span>
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
+                      {totalItems > 99 ? '99+' : totalItems}
+                    </span>
+                  )}
                 </Link>
 
                 <button
@@ -79,15 +103,15 @@ export default function Navbar() {
                   title="Cerrar Sesión"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Cerrar Sesión</span>
+                  <span className="hidden sm:inline">Salir</span>
                 </button>
               </div>
             ) : (
               /* Estado 3: Rol CLIENT */
-              <div className="flex items-center gap-3 sm:gap-4">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-700">
                   <UserIcon className="w-4 h-4 text-slate-400" />
-                  <span>{user.name}</span>
+                  <span className="hidden sm:inline">{user.name}</span>
                 </div>
 
                 <Link
@@ -97,13 +121,28 @@ export default function Navbar() {
                   Catálogo
                 </Link>
 
+                {/* Enlace Carrito con Badge */}
+                <Link
+                  href="/cart"
+                  className="relative inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition"
+                  title="Carrito de compras"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span className="hidden sm:inline">Carrito</span>
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-indigo-600 text-white text-[10px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
+                      {totalItems > 99 ? '99+' : totalItems}
+                    </span>
+                  )}
+                </Link>
+
                 <button
                   onClick={logout}
-                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-xl transition"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-xl transition"
                   title="Cerrar Sesión"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Cerrar Sesión</span>
+                  <span className="hidden sm:inline">Salir</span>
                 </button>
               </div>
             )}

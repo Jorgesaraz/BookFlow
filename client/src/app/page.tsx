@@ -88,7 +88,7 @@ export default function HomePage() {
   };
 
   const handleAddToCartToast = (bookTitle: string) => {
-    setToastMessage(`"${bookTitle}" seleccionado. El carrito se conectará en la Fase 5.`);
+    setToastMessage(`"${bookTitle}" agregado al carrito de compras.`);
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
