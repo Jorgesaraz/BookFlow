@@ -2,24 +2,28 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useCart } from '../../context/CartContext';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+import api from '../../lib/api';
 import {
   ShoppingCart,
   Trash2,
   Plus,
   Minus,
-  ArrowRight,
   BookOpen,
   ShieldCheck,
   Zap,
   AlertCircle,
   CheckCircle2,
   X,
-  CreditCard
+  CreditCard,
+  Loader2
 } from 'lucide-react';
 
 export default function CartPage() {
+  const router = useRouter();
   const {
     items,
     totalItems,
@@ -27,57 +31,109 @@ export default function CartPage() {
     loading,
     updateQuantity,
     removeFromCart,
-    clearCart
+    clearCart,
+    refreshCart
   } = useCart();
 
-  const [checkoutNotification, setCheckoutNotification] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  const paypalClientId =
+    process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID ||
+    'AW0z7hCaAm6CiGPNwWY1VE1ejZzvCl2IHqH5khpYLpSLisjmskA60FomkG-cxl75nApMKF8N0zGWxCy5';
 
   const handleUpdate = async (bookId: string, newQty: number) => {
     setActionLoadingId(bookId);
+    setPaymentError(null);
     await updateQuantity(bookId, newQty);
     setActionLoadingId(null);
   };
 
   const handleRemove = async (bookId: string) => {
     setActionLoadingId(bookId);
+    setPaymentError(null);
     await removeFromCart(bookId);
     setActionLoadingId(null);
   };
 
   const handleClear = async () => {
     if (window.confirm('¿Estás seguro de que deseas vaciar tu carrito de compras?')) {
+      setPaymentError(null);
       await clearCart();
     }
   };
 
-  const handleCheckoutClick = () => {
-    setCheckoutNotification(
-      'El módulo de pago seguro e integración con PayPal Sandbox se activará en la Fase 6.'
-    );
-    setTimeout(() => {
-      setCheckoutNotification(null);
-    }, 5000);
+  // Crear la orden en PayPal Sandbox a través de nuestro backend
+  const handleCreateOrder = async (): Promise<string> => {
+    setPaymentError(null);
+    try {
+      const res = await api.post('/orders/create-paypal-order');
+      if (!res.data.success || !res.data.paypalOrderId) {
+        throw new Error(res.data.message || 'Error al iniciar la orden de pago en PayPal.');
+      }
+      return res.data.paypalOrderId;
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.message || err.message || 'Error al generar la orden en PayPal Sandbox.';
+      setPaymentError(errorMsg);
+      throw new Error(errorMsg);
+    }
+  };
+
+  // Capturar el pago tras la aprobación del comprador en el popup de PayPal
+  const handleApprove = async (data: any) => {
+    setPaymentProcessing(true);
+    setPaymentError(null);
+    try {
+      const res = await api.post('/orders/capture-paypal-order', {
+        paypalOrderId: data.orderID
+      });
+
+      if (res.data.success) {
+        setPaymentSuccess(true);
+        await refreshCart();
+        setTimeout(() => {
+          router.push('/orders');
+        }, 2200);
+      } else {
+        setPaymentError(res.data.message || 'No se pudo confirmar la captura del pago.');
+      }
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.message || err.message || 'Error al capturar el pago en PayPal Sandbox.';
+      setPaymentError(errorMsg);
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
+
+  const handlePayPalError = (err: any) => {
+    console.error('Error reportado por PayPal Sandbox:', err);
+    setPaymentError('Ocurrió un error al procesar el pago con PayPal o la transacción fue cancelada.');
   };
 
   return (
     <ProtectedRoute allowedRoles={['CLIENT', 'ADMIN']}>
       <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
         
-        {/* Notificación de Checkout para Fase 6 */}
-        {checkoutNotification && (
-          <div className="fixed bottom-6 right-6 z-50 max-w-md bg-slate-900 text-white px-5 py-4 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-bounce">
-            <CheckCircle2 className="w-5 h-5 text-indigo-400 shrink-0" />
-            <div className="text-xs sm:text-sm font-medium">
-              <span className="font-bold block text-indigo-300">Próximo paso: Fase 6</span>
-              {checkoutNotification}
+        {/* Banner de Éxito Flotante */}
+        {paymentSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-2xl border border-emerald-100">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900">¡Pago Confirmado con Éxito!</h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Tu orden ha sido registrada correctamente. Ya puedes acceder y descargar tus e-books en tu biblioteca digital.
+              </p>
+              <div className="pt-2 flex items-center justify-center gap-2 text-xs font-bold text-indigo-600">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Redirigiendo a Mis Compras...</span>
+              </div>
             </div>
-            <button
-              onClick={() => setCheckoutNotification(null)}
-              className="text-slate-400 hover:text-white ml-auto"
-            >
-              <X className="w-4 h-4" />
-            </button>
           </div>
         )}
 
@@ -91,7 +147,7 @@ export default function CartPage() {
                 <span>Carrito de Compras</span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Revisa y ajusta los libros electrónicos seleccionados antes de proceder al pago.
+                Revisa y confirma tus libros electrónicos antes de pagar con PayPal Sandbox.
               </p>
             </div>
 
@@ -105,6 +161,25 @@ export default function CartPage() {
               </button>
             )}
           </div>
+
+          {/* Alerta de Error de Pago o Stock */}
+          {paymentError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-start justify-between gap-3 text-xs sm:text-sm">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">No se pudo completar la operación</span>
+                  <span>{paymentError}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setPaymentError(null)}
+                className="text-rose-400 hover:text-rose-700 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           {/* Estado Cargando */}
           {loading && items.length === 0 ? (
@@ -230,10 +305,11 @@ export default function CartPage() {
                 })}
               </div>
 
-              {/* Resumen de Compra (4 cols) */}
+              {/* Resumen de Compra y Botón PayPal (4 cols) */}
               <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xl space-y-6 sticky top-24">
-                <h2 className="text-lg font-black text-slate-900 pb-3 border-b border-slate-100">
-                  Resumen del Pedido
+                <h2 className="text-lg font-black text-slate-900 pb-3 border-b border-slate-100 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-indigo-600" />
+                  <span>Resumen del Pedido</span>
                 </h2>
 
                 <div className="space-y-3 text-xs sm:text-sm">
@@ -263,23 +339,47 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                <button
-                  onClick={handleCheckoutClick}
-                  className="w-full py-4 px-6 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 transition active:scale-[0.99]"
-                >
-                  <CreditCard className="w-5 h-5" />
-                  <span>Proceder al Pago</span>
-                  <ArrowRight className="w-4 h-4 ml-1" />
-                </button>
+                {/* Integración Oficial de PayPal Sandbox */}
+                <div className="pt-2">
+                  {paymentProcessing ? (
+                    <div className="p-6 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-center space-y-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
+                      <p className="text-xs font-bold text-indigo-900">Procesando y capturando el pago...</p>
+                      <p className="text-[11px] text-slate-500">Por favor, no cierres esta ventana.</p>
+                    </div>
+                  ) : (
+                    <PayPalScriptProvider
+                      options={{
+                        clientId: paypalClientId,
+                        currency: 'USD',
+                        intent: 'capture'
+                      }}
+                    >
+                      <div className="min-h-[120px]">
+                        <PayPalButtons
+                          style={{
+                            layout: 'vertical',
+                            shape: 'rect',
+                            color: 'gold',
+                            label: 'pay'
+                          }}
+                          createOrder={handleCreateOrder}
+                          onApprove={handleApprove}
+                          onError={handlePayPalError}
+                        />
+                      </div>
+                    </PayPalScriptProvider>
+                  )}
+                </div>
 
                 <div className="pt-2 border-t border-slate-100 space-y-2 text-[11px] text-slate-400">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Pago verificado vía PayPal Sandbox.</span>
+                    <span>Pago seguro procesado por PayPal Sandbox.</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span>Descarga digital protegida disponible al instante.</span>
+                    <span>Acceso y descarga de tus e-books garantizados al instante.</span>
                   </div>
                 </div>
               </div>

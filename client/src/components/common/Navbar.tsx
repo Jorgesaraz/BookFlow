@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   User as UserIcon,
   KanbanSquare,
-  ShoppingCart
+  ShoppingCart,
+  Package
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -35,7 +36,7 @@ export default function Navbar() {
           </Link>
 
           {/* Navegación y Estado de Autenticación */}
-          <nav className="flex items-center gap-3 sm:gap-5">
+          <nav className="flex items-center gap-3 sm:gap-4">
             
             {!user ? (
               /* Estado 1: Sin sesión */
@@ -82,6 +83,15 @@ export default function Navbar() {
                   <span className="hidden sm:inline">Tablero Kanban</span>
                 </Link>
 
+                {/* Enlace Mis Compras */}
+                <Link
+                  href="/orders"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition"
+                >
+                  <Package className="w-4 h-4" />
+                  <span className="hidden sm:inline">Mis Compras</span>
+                </Link>
+
                 {/* Enlace Carrito con Badge */}
                 <Link
                   href="/cart"
@@ -119,6 +129,15 @@ export default function Navbar() {
                   className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition"
                 >
                   Catálogo
+                </Link>
+
+                {/* Enlace Mis Compras */}
+                <Link
+                  href="/orders"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition"
+                >
+                  <Package className="w-4 h-4" />
+                  <span className="hidden sm:inline">Mis Compras</span>
                 </Link>
 
                 {/* Enlace Carrito con Badge */}

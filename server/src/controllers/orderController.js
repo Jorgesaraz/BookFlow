@@ -1,75 +1,197 @@
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
+const Cart = require('../models/Cart');
 const Book = require('../models/Book');
-const { getIO } = require('../config/socket');
+const { createPayPalOrder, capturePayPalOrder } = require('../services/paypalService');
 
-// @desc    Crear un nuevo pedido preliminar
-// @route   POST /api/orders
-// @access  Private/Client
-const createOrder = async (req, res, next) => {
+// @desc    Crear una orden de PayPal Sandbox basada en el carrito del usuario
+// @route   POST /api/orders/create-paypal-order
+// @access  Private
+const createPayPalOrderEndpoint = async (req, res, next) => {
   try {
-    const { items, shippingAddress, itemsPrice, shippingPrice, totalPrice } = req.body;
-
-    if (!items || items.length === 0) {
-      return res.status(400).json({ success: false, message: 'El carrito no contiene artículos' });
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuario no autenticado.' });
     }
 
-    // Validar existencia y stock de libros
-    for (const item of items) {
-      const book = await Book.findById(item.book);
+    const cart = await Cart.findOne({ user: userId }).populate('items.book');
+    if (!cart || !cart.items || cart.items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'El carrito de compras está vacío. Agrega libros antes de pagar.'
+      });
+    }
+
+    let totalAmount = 0;
+    const orderItems = [];
+
+    for (const item of cart.items) {
+      const book = item.book;
       if (!book) {
-        return res.status(404).json({ success: false, message: `El libro "${item.title}" no existe` });
+        return res.status(400).json({
+          success: false,
+          message: 'Uno de los libros de tu carrito ya no existe en el catálogo.'
+        });
       }
+
+      if (!book.availability || book.stock <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: `El libro "${book.title}" se encuentra agotado.`
+        });
+      }
+
       if (book.stock < item.quantity) {
         return res.status(400).json({
           success: false,
           message: `Stock insuficiente para "${book.title}". Stock disponible: ${book.stock}`
         });
       }
+
+      const itemPrice = Number(book.price);
+      totalAmount += itemPrice * item.quantity;
+
+      orderItems.push({
+        book: book._id,
+        title: book.title,
+        price: itemPrice,
+        quantity: item.quantity
+      });
     }
 
-    const order = new Order({
-      user: req.user._id,
-      items,
-      shippingAddress,
-      itemsPrice,
-      shippingPrice: shippingPrice || 0,
-      totalPrice,
-      status: 'PENDING_PAYMENT',
-      statusHistory: [{
-        status: 'PENDING_PAYMENT',
-        changedAt: new Date(),
-        comment: 'Pedido generado, pendiente de pago'
-      }]
+    totalAmount = Number(totalAmount.toFixed(2));
+
+    const paypalOrder = await createPayPalOrder(totalAmount);
+    if (!paypalOrder || !paypalOrder.id) {
+      return res.status(500).json({
+        success: false,
+        message: 'No se pudo generar la orden de pago en PayPal Sandbox.'
+      });
+    }
+
+    const order = await Order.create({
+      user: userId,
+      items: orderItems,
+      totalAmount,
+      status: 'PENDING',
+      paypalOrderId: paypalOrder.id
     });
-
-    const createdOrder = await order.save();
-    const populatedOrder = await Order.findById(createdOrder._id)
-      .populate('user', 'name email');
-
-    // Notificar a los administradores vía Socket.IO (Kanban en tiempo real)
-    const io = getIO();
-    if (io) {
-      io.to('admin_room').emit('order:created', populatedOrder);
-    }
 
     res.status(201).json({
       success: true,
-      data: populatedOrder
+      paypalOrderId: paypalOrder.id,
+      orderId: order._id
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Obtener pedidos del cliente autenticado
-// @route   GET /api/orders/my-orders
-// @access  Private/Client
-const getMyOrders = async (req, res, next) => {
+// @desc    Capturar y confirmar el pago de PayPal Sandbox
+// @route   POST /api/orders/capture-paypal-order
+// @access  Private
+const capturePayPalOrderEndpoint = async (req, res, next) => {
   try {
-    const orders = await Order.find({ user: req.user._id })
-      .sort({ createdAt: -1 });
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuario no autenticado.' });
+    }
 
-    res.json({
+    const { paypalOrderId } = req.body;
+    if (!paypalOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'El identificador paypalOrderId es obligatorio.'
+      });
+    }
+
+    const order = await Order.findOne({ paypalOrderId, user: userId });
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada o no pertenece al usuario autenticado.'
+      });
+    }
+
+    if (order.status === 'COMPLETED') {
+      return res.status(200).json({
+        success: true,
+        message: 'La orden ya ha sido completada previamente.',
+        order
+      });
+    }
+
+    const captureData = await capturePayPalOrder(paypalOrderId);
+
+    if (captureData && captureData.status === 'COMPLETED') {
+      const captureId =
+        captureData.purchase_units?.[0]?.payments?.captures?.[0]?.id || captureData.id;
+
+      order.status = 'COMPLETED';
+      order.paypalCaptureId = captureId;
+      order.paidAt = new Date();
+      await order.save();
+
+      for (const item of order.items) {
+        const book = await Book.findById(item.book);
+        if (book) {
+          book.stock = Math.max(0, book.stock - item.quantity);
+          book.availability = book.stock > 0;
+          await book.save();
+        }
+      }
+
+      await Cart.findOneAndUpdate({ user: userId }, { $set: { items: [] } });
+
+      try {
+        const { getIO } = require('../config/socket');
+        const io = getIO();
+        if (io) {
+          io.to('admin_room').emit('order:created', order);
+          io.to(`user_${userId}`).emit('order:updated', order);
+        }
+      } catch (e) {
+        // Socket opcional
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Pago completado exitosamente',
+        order
+      });
+    } else {
+      order.status = 'FAILED';
+      await order.save();
+
+      res.status(400).json({
+        success: false,
+        message: 'No se pudo capturar el pago en PayPal Sandbox. Estado no completado.',
+        details: captureData
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Obtener historial de compras del usuario con digitalFile accesible
+// @route   GET /api/orders/my-orders
+// @access  Private
+const getMyOrdersEndpoint = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuario no autenticado.' });
+    }
+
+    const orders = await Order.find({ user: userId, status: 'COMPLETED' })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'items.book',
+        select: 'title author coverImage category +digitalFile'
+      });
+
+    res.status(200).json({
       success: true,
       count: orders.length,
       data: orders
@@ -79,100 +201,34 @@ const getMyOrders = async (req, res, next) => {
   }
 };
 
-// @desc    Obtener un pedido por ID
+// @desc    Obtener detalle de una orden por ID
 // @route   GET /api/orders/:id
 // @access  Private
-const getOrderById = async (req, res, next) => {
+const getOrderByIdEndpoint = async (req, res, next) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate('user', 'name email');
+    const userId = req.user?.userId;
+    const { id } = req.params;
 
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({ success: false, message: 'ID de orden no válido.' });
     }
 
-    // Validar que el usuario sea el dueño de la orden o un ADMIN
-    if (order.user._id.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ success: false, message: 'No tienes autorización para ver este pedido' });
-    }
-
-    res.json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Obtener todos los pedidos (para el Tablero Kanban de Administración)
-// @route   GET /api/orders/admin/all
-// @access  Private/Admin
-const getAllOrdersAdmin = async (req, res, next) => {
-  try {
-    const orders = await Order.find()
-      .populate('user', 'name email')
-      .sort({ updatedAt: -1 });
-
-    res.json({
-      success: true,
-      count: orders.length,
-      data: orders
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Actualizar el estado de un pedido (mover tarjeta en Kanban)
-// @route   PATCH /api/orders/:id/status
-// @access  Private/Admin
-const updateOrderStatus = async (req, res, next) => {
-  try {
-    const { status, comment } = req.body;
-    const validStatuses = ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'];
-
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ success: false, message: `Estado no válido. Opciones: ${validStatuses.join(', ')}` });
-    }
-
-    const order = await Order.findById(req.params.id).populate('user', 'name email');
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
-    }
-
-    const prevStatus = order.status;
-    order.status = status;
-    order.statusHistory.push({
-      status,
-      changedAt: new Date(),
-      comment: comment || `Estado cambiado por administrador de ${prevStatus} a ${status}`
+    const order = await Order.findById(id).populate({
+      path: 'items.book',
+      select: 'title author coverImage category +digitalFile'
     });
 
-    if (status === 'COMPLETED' && !order.deliveredAt) {
-      order.deliveredAt = new Date();
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Orden no encontrada.' });
     }
 
-    const updatedOrder = await order.save();
-
-    // Notificar en tiempo real vía Socket.IO
-    const io = getIO();
-    if (io) {
-      // Notificar a todos los administradores en el Kanban
-      io.to('admin_room').emit('order:status_updated', {
-        orderId: updatedOrder._id,
-        status: updatedOrder.status,
-        order: updatedOrder
-      });
-
-      // Notificar al cliente específico para actualizar su pantalla en vivo
-      io.to(`user_${order.user._id}`).emit('order:status_updated', {
-        orderId: updatedOrder._id,
-        status: updatedOrder.status,
-        order: updatedOrder
-      });
+    if (order.user.toString() !== userId && req.user?.role !== 'ADMIN') {
+      return res.status(403).json({ success: false, message: 'No tienes permiso para ver esta orden.' });
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
-      data: updatedOrder
+      data: order
     });
   } catch (error) {
     next(error);
@@ -180,9 +236,8 @@ const updateOrderStatus = async (req, res, next) => {
 };
 
 module.exports = {
-  createOrder,
-  getMyOrders,
-  getOrderById,
-  getAllOrdersAdmin,
-  updateOrderStatus
+  createPayPalOrderEndpoint,
+  capturePayPalOrderEndpoint,
+  getMyOrdersEndpoint,
+  getOrderByIdEndpoint
 };

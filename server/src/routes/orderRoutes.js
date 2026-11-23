@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createOrder,
-  getMyOrders,
-  getOrderById,
-  getAllOrdersAdmin,
-  updateOrderStatus
+  createPayPalOrderEndpoint,
+  capturePayPalOrderEndpoint,
+  getMyOrdersEndpoint,
+  getOrderByIdEndpoint
 } = require('../controllers/orderController');
-const { protect, authorize } = require('../middleware/authMiddleware');
+const { authenticate } = require('../middlewares/auth.middleware');
 
-router.post('/', protect, createOrder);
-router.get('/my-orders', protect, getMyOrders);
-router.get('/admin/all', protect, authorize('ADMIN'), getAllOrdersAdmin);
-router.get('/:id', protect, getOrderById);
-router.patch('/:id/status', protect, authorize('ADMIN'), updateOrderStatus);
+// Todas las rutas de órdenes están protegidas con el middleware authenticate
+router.use(authenticate);
+
+router.post('/create-paypal-order', createPayPalOrderEndpoint);
+router.post('/capture-paypal-order', capturePayPalOrderEndpoint);
+router.get('/my-orders', getMyOrdersEndpoint);
+router.get('/:id', getOrderByIdEndpoint);
 
 module.exports = router;

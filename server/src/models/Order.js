@@ -1,83 +1,67 @@
 const mongoose = require('mongoose');
 
-const orderItemSchema = new mongoose.Schema({
-  book: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Book',
-    required: true
-  },
-  title: { type: String, required: true },
-  price: { type: Number, required: true },
-  quantity: { type: Number, required: true, min: 1 },
-  coverImage: { type: String, required: true }
-});
-
-const statusHistorySchema = new mongoose.Schema({
-  status: {
-    type: String,
-    enum: ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'],
-    required: true
-  },
-  changedAt: { type: Date, default: Date.now },
-  comment: { type: String, default: '' }
-});
-
-const orderSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  items: [orderItemSchema],
-  shippingAddress: {
-    recipientName: { type: String, required: true },
-    street: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String },
-    postalCode: { type: String, required: true },
-    country: { type: String, required: true },
-    phone: { type: String, required: true }
-  },
-  paymentMethod: {
-    type: String,
-    default: 'PAYPAL'
-  },
-  paymentResult: {
-    id: String,           // PayPal Order ID
-    status: String,       // COMPLETED
-    update_time: String,
-    email_address: String
-  },
-  itemsPrice: { type: Number, required: true },
-  shippingPrice: { type: Number, default: 0 },
-  taxPrice: { type: Number, default: 0 },
-  totalPrice: { type: Number, required: true },
-  status: {
-    type: String,
-    enum: ['PENDING_PAYMENT', 'PAID', 'PROCESSING', 'COMPLETED', 'CANCELLED'],
-    default: 'PENDING_PAYMENT'
-  },
-  paidAt: Date,
-  deliveredAt: Date,
-  statusHistory: [statusHistorySchema]
-}, { timestamps: true });
-
-// Registrar cambio de estado en el historial antes de guardar si cambió
-orderSchema.pre('save', function (next) {
-  if (this.isModified('status')) {
-    this.statusHistory.push({
-      status: this.status,
-      changedAt: new Date(),
-      comment: `Transición automática a ${this.status}`
-    });
-    if (this.status === 'PAID' && !this.paidAt) {
-      this.paidAt = new Date();
+const orderItemSchema = new mongoose.Schema(
+  {
+    book: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Book',
+      required: [true, 'El libro es obligatorio']
+    },
+    title: {
+      type: String,
+      required: [true, 'El título del libro es obligatorio']
+    },
+    price: {
+      type: Number,
+      required: [true, 'El precio del libro es obligatorio'],
+      min: [0, 'El precio no puede ser negativo']
+    },
+    quantity: {
+      type: Number,
+      required: [true, 'La cantidad es obligatoria'],
+      min: [1, 'La cantidad mínima es 1']
     }
-    if (this.status === 'COMPLETED' && !this.deliveredAt) {
-      this.deliveredAt = new Date();
+  },
+  { _id: true }
+);
+
+const orderSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: [true, 'El usuario es obligatorio']
+    },
+    items: {
+      type: [orderItemSchema],
+      required: [true, 'Los ítems del pedido son obligatorios'],
+      validate: [(val) => val.length > 0, 'La orden debe contener al menos un libro']
+    },
+    totalAmount: {
+      type: Number,
+      required: [true, 'El monto total es obligatorio'],
+      min: [0, 'El monto total no puede ser negativo']
+    },
+    status: {
+      type: String,
+      enum: ['PENDING', 'COMPLETED', 'FAILED'],
+      default: 'PENDING'
+    },
+    paypalOrderId: {
+      type: String,
+      required: [true, 'El paypalOrderId es obligatorio'],
+      unique: true
+    },
+    paypalCaptureId: {
+      type: String
+    },
+    paidAt: {
+      type: Date
     }
+  },
+  {
+    timestamps: true
   }
-  next();
-});
+);
 
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);
