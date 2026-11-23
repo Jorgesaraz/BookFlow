@@ -8,6 +8,16 @@ const nextConfig = {
       'm.media-amazon.com',
       'books.google.com'
     ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
+      }
+    ]
   },
 };
 

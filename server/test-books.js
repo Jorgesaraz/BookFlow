@@ -1,5 +1,5 @@
 const Book = require('./src/models/Book');
-const { getBooks, getBookById, createBook, updateBook, deleteBook } = require('./src/controllers/bookController');
+const { getBooks, getCategories, getBookById, createBook, updateBook, deleteBook } = require('./src/controllers/bookController');
 
 console.log('🧪 [TEST] Verificando especificaciones de Book Model y Controlador...');
 
@@ -53,8 +53,12 @@ try {
     digitalFile: 'http://file.com'
   });
 
-  // Ejecutar manualmente la función pre-save
-  const preSaveHook = Book.schema.s.hooks._pres.get('save')[0].fn;
+  // Localizar el hook pre-save de availability (anónimo o con lógica de disponibilidad)
+  const preSaveHooks = Book.schema.s.hooks._pres.get('save');
+  const customHookObj = preSaveHooks.find(h => !h.fn.name || h.fn.name === 'anonymous' || h.fn.toString().includes('availability'));
+  if (!customHookObj) throw new Error('No se encontró el hook pre-save de availability');
+  const preSaveHook = customHookObj.fn;
+
   preSaveHook.call(bookInStock, () => {});
   if (bookInStock.availability !== true) throw new Error('availability debería ser true con stock > 0');
 
@@ -80,6 +84,7 @@ try {
 // 3. Verificación de controladores exportados
 try {
   if (typeof getBooks !== 'function') throw new Error('getBooks no es función');
+  if (typeof getCategories !== 'function') throw new Error('getCategories no es función');
   if (typeof getBookById !== 'function') throw new Error('getBookById no es función');
   if (typeof createBook !== 'function') throw new Error('createBook no es función');
   if (typeof updateBook !== 'function') throw new Error('updateBook no es función');

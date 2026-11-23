@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getBooks,
+  getCategories,
   getBookById,
   createBook,
   updateBook,
@@ -12,6 +13,7 @@ const router = Router();
 
 // Rutas públicas del catálogo
 router.get('/', getBooks);
+router.get('/categories', getCategories);
 router.get('/:id', getBookById);
 
 // Rutas administrativas protegidas (solo rol ADMIN)

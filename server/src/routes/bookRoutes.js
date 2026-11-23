@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getBooks,
+  getCategories,
   getBookById,
   createBook,
   updateBook,
@@ -11,6 +12,7 @@ const { authenticate, authorizeRoles } = require('../middlewares/auth.middleware
 
 // Rutas públicas del catálogo
 router.get('/', getBooks);
+router.get('/categories', getCategories);
 router.get('/:id', getBookById);
 
 // Rutas administrativas protegidas (solo rol ADMIN)

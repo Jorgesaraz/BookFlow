@@ -46,8 +46,8 @@ export default function Navbar() {
               </div>
             ) : user.role === 'ADMIN' ? (
               /* Estado 2: Rol ADMIN */
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="hidden md:flex items-center gap-2">
                   <span className="text-xs sm:text-sm font-bold text-slate-800">
                     {user.name}
                   </span>
@@ -58,8 +58,16 @@ export default function Navbar() {
                 </div>
 
                 <Link
-                  href="/admin/kanban"
+                  href="/admin/books"
                   className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-xl border border-indigo-200/60 transition"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Gestionar Catálogo</span>
+                </Link>
+
+                <Link
+                  href="/admin/kanban"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition"
                 >
                   <KanbanSquare className="w-4 h-4" />
                   <span>Tablero Kanban</span>
@@ -67,7 +75,7 @@ export default function Navbar() {
 
                 <button
                   onClick={logout}
-                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-3 py-1.5 rounded-xl transition"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-xl transition"
                   title="Cerrar Sesión"
                 >
                   <LogOut className="w-4 h-4" />
@@ -83,7 +91,7 @@ export default function Navbar() {
                 </div>
 
                 <Link
-                  href="/books"
+                  href="/"
                   className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition"
                 >
                   Catálogo

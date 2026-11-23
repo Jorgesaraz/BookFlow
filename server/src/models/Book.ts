@@ -71,8 +71,8 @@ bookSchema.pre<IBook>('save', function (next) {
   next();
 });
 
-// Middleware para operaciones findOneAndUpdate / updateOne
-bookSchema.pre('findOneAndUpdate', function (next) {
+// Middleware para operaciones findOneAndUpdate / updateOne / updateMany
+bookSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'] as any, function (this: any, next) {
   const update: any = this.getUpdate();
   if (update) {
     if (update.stock !== undefined) {

@@ -65,6 +65,23 @@ export const getBooks = async (req: Request, res: Response, next: NextFunction):
 };
 
 /**
+ * @desc    Obtener lista de categorías únicas disponibles
+ * @route   GET /api/books/categories
+ * @access  Public
+ */
+export const getCategories = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const categories = await Book.distinct('category');
+    res.status(200).json({
+      success: true,
+      data: categories
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Obtener un libro por ID (sin digitalFile)
  * @route   GET /api/books/:id
  * @access  Public
@@ -260,6 +277,7 @@ export const deleteBook = async (req: Request, res: Response, next: NextFunction
 
 export default {
   getBooks,
+  getCategories,
   getBookById,
   createBook,
   updateBook,
