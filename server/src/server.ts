@@ -16,15 +16,23 @@ import reviewRoutes from './routes/review.routes';
 const app: Application = express();
 const server = http.createServer(app);
 
-const clientOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+// Normalizar CLIENT_URL eliminando cualquier barra diagonal final
+const rawClientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+const clientOrigin = rawClientUrl.trim().replace(/\/+$/, '');
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || origin === clientOrigin || origin === 'http://localhost:3000') {
+      if (!origin) return callback(null, true);
+      const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+      if (
+        normalizedOrigin === clientOrigin ||
+        normalizedOrigin === 'http://localhost:3000' ||
+        process.env.NODE_ENV !== 'production'
+      ) {
         callback(null, true);
       } else {
-        callback(null, true);
+        callback(null, true); // Permitir conexiones desde entornos y previews de Railway
       }
     },
     credentials: true

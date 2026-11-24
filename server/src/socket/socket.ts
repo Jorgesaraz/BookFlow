@@ -8,15 +8,23 @@ let ioInstance: SocketIOServer | null = null;
  * Inicializa la instancia central de Socket.IO vinculada al servidor HTTP
  */
 export const initSocket = (httpServer: HttpServer): SocketIOServer => {
-  const clientOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+  // Normalizar CLIENT_URL eliminando cualquier barra diagonal final
+  const rawClientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const clientOrigin = rawClientUrl.trim().replace(/\/+$/, '');
 
   ioInstance = new SocketIOServer(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || origin === clientOrigin || origin === 'http://localhost:3000') {
+        if (!origin) return callback(null, true);
+        const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+        if (
+          normalizedOrigin === clientOrigin ||
+          normalizedOrigin === 'http://localhost:3000' ||
+          process.env.NODE_ENV !== 'production'
+        ) {
           callback(null, true);
         } else {
-          callback(null, true); // Permitir en desarrollo local
+          callback(null, true); // Permitir en desarrollo y previews de despliegue
         }
       },
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
