@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Cart = require('../models/Cart');
 const Book = require('../models/Book');
+const User = require('../models/User');
 const { createPayPalOrder, capturePayPalOrder } = require('../services/paypalService');
 
 // @desc    Crear una orden de PayPal Sandbox basada en el carrito del usuario
@@ -262,9 +263,105 @@ const getOrderByIdEndpoint = async (req, res, next) => {
   }
 };
 
+// @desc    Obtener métricas y lista de órdenes para el Dashboard y Kanban de ADMIN
+// @route   GET /api/orders/admin/dashboard
+// @access  Private/Admin
+const getAdminDashboardOrdersEndpoint = async (req, res, next) => {
+  try {
+    const orders = await Order.find()
+      .sort({ createdAt: -1 })
+      .populate('user', 'name email');
+
+    const completedOrdersList = orders.filter((o) => o.status === 'COMPLETED');
+    const rawRevenue = completedOrdersList.reduce((acc, o) => acc + (o.totalAmount || 0), 0);
+    const totalRevenue = Number(rawRevenue.toFixed(2));
+
+    const completedOrders = completedOrdersList.length;
+    const pendingOrders = orders.filter((o) => o.status === 'PENDING').length;
+    const totalClients = await User.countDocuments({ role: 'CLIENT' });
+    const lowStockBooks = await Book.countDocuments({ stock: { $lte: 2 } });
+
+    const metrics = {
+      totalRevenue,
+      completedOrders,
+      pendingOrders,
+      totalClients,
+      lowStockBooks
+    };
+
+    res.status(200).json({
+      success: true,
+      metrics,
+      orders,
+      data: {
+        metrics,
+        orders
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Actualizar estado de una orden (para drag-and-drop del Tablero Kanban)
+// @route   PATCH /api/orders/:id/status
+// @access  Private/Admin
+const updateOrderStatusEndpoint = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['PENDING', 'COMPLETED', 'FAILED'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Estado inválido. Debe ser PENDING, COMPLETED o FAILED.'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(404).json({
+        success: false,
+        message: 'ID de orden no válido.'
+      });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).populate('user', 'name email');
+
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada.'
+      });
+    }
+
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().to('admin-room').emit('order-status-updated', updatedOrder);
+    } catch (e) {
+      console.warn('[Socket.IO] Error emitiendo order-status-updated:', e.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Estado de la orden actualizado exitosamente.',
+      data: updatedOrder,
+      order: updatedOrder
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createPayPalOrderEndpoint,
   capturePayPalOrderEndpoint,
   getMyOrdersEndpoint,
-  getOrderByIdEndpoint
+  getOrderByIdEndpoint,
+  getAdminDashboardOrdersEndpoint,
+  updateOrderStatusEndpoint
 };

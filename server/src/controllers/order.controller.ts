@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Order, { IOrder } from '../models/Order';
 import Cart from '../models/Cart';
 import Book from '../models/Book';
+import User from '../models/User';
 import { createPayPalOrder, capturePayPalOrder } from '../services/paypal.service';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
@@ -314,9 +315,128 @@ export const getOrderByIdEndpoint = async (
   }
 };
 
+/**
+ * @desc    Obtener métricas y lista de órdenes para el Dashboard y Kanban de ADMIN
+ * @route   GET /api/orders/admin/dashboard
+ * @access  Private/Admin
+ */
+export const getAdminDashboardOrdersEndpoint = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // 1. Obtener todas las órdenes ordenadas por fecha descendente
+    const orders = await Order.find()
+      .sort({ createdAt: -1 })
+      .populate('user', 'name email');
+
+    // 2. Calcular totalRevenue de órdenes COMPLETED (redondeado a 2 decimales)
+    const completedOrdersList = orders.filter((o) => o.status === 'COMPLETED');
+    const rawRevenue = completedOrdersList.reduce((acc, o) => acc + (o.totalAmount || 0), 0);
+    const totalRevenue = Number(rawRevenue.toFixed(2));
+
+    // 3. Conteo de órdenes
+    const completedOrders = completedOrdersList.length;
+    const pendingOrders = orders.filter((o) => o.status === 'PENDING').length;
+
+    // 4. Conteo de clientes (User con role === 'CLIENT')
+    const totalClients = await User.countDocuments({ role: 'CLIENT' });
+
+    // 5. Conteo de libros con stock bajo (stock <= 2)
+    const lowStockBooks = await Book.countDocuments({ stock: { $lte: 2 } });
+
+    const metrics = {
+      totalRevenue,
+      completedOrders,
+      pendingOrders,
+      totalClients,
+      lowStockBooks
+    };
+
+    res.status(200).json({
+      success: true,
+      metrics,
+      orders,
+      data: {
+        metrics,
+        orders
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Actualizar estado de una orden (para drag-and-drop del Tablero Kanban)
+ * @route   PATCH /api/orders/:id/status
+ * @access  Private/Admin
+ */
+export const updateOrderStatusEndpoint = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['PENDING', 'COMPLETED', 'FAILED'];
+    if (!status || !validStatuses.includes(status)) {
+      res.status(400).json({
+        success: false,
+        message: 'Estado inválido. Debe ser PENDING, COMPLETED o FAILED.'
+      });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id as string)) {
+      res.status(404).json({
+        success: false,
+        message: 'ID de orden no válido.'
+      });
+      return;
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true, runValidators: true }
+    ).populate('user', 'name email');
+
+    if (!updatedOrder) {
+      res.status(404).json({
+        success: false,
+        message: 'Orden no encontrada.'
+      });
+      return;
+    }
+
+    // Emitir evento por Socket.IO a admin-room para sincronizar el tablero
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().to('admin-room').emit('order-status-updated', updatedOrder);
+    } catch (e: any) {
+      console.warn('[Socket.IO] Error emitiendo order-status-updated:', e.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Estado de la orden actualizado exitosamente.',
+      data: updatedOrder,
+      order: updatedOrder
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   createPayPalOrderEndpoint,
   capturePayPalOrderEndpoint,
   getMyOrdersEndpoint,
-  getOrderByIdEndpoint
+  getOrderByIdEndpoint,
+  getAdminDashboardOrdersEndpoint,
+  updateOrderStatusEndpoint
 };
