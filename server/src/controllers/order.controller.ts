@@ -179,14 +179,41 @@ export const capturePayPalOrderEndpoint = async (
 
       // 3.4 Notificación en tiempo real vía Socket.IO
       try {
-        const { getIO } = require('../config/socket');
+        const { getIO } = require('../socket/socket');
         const io = getIO();
-        if (io) {
-          io.to('admin_room').emit('order:created', order);
-          io.to(`user_${userId}`).emit('order:updated', order);
+
+        // 1. Notificar a admins: nueva orden
+        const User = require('../models/User');
+        const orderUser: any = await User.findById(userId).select('email');
+        io.to('admin-room').emit('new-order', {
+          orderId: order._id,
+          totalAmount: order.totalAmount,
+          customerEmail: orderUser?.email || 'unknown',
+          itemsCount: order.items.length,
+          createdAt: order.createdAt || new Date()
+        });
+
+        // 2. Por cada libro: stock-updated global + low-stock-alert a admin
+        for (const item of order.items) {
+          const updatedBook: any = await Book.findById(item.book);
+          if (updatedBook) {
+            io.emit('stock-updated', {
+              bookId: updatedBook._id.toString(),
+              stock: updatedBook.stock,
+              availability: updatedBook.availability
+            });
+            if (updatedBook.stock <= 2) {
+              io.to('admin-room').emit('low-stock-alert', {
+                bookId: updatedBook._id.toString(),
+                title: updatedBook.title,
+                stock: updatedBook.stock,
+                availability: updatedBook.availability
+              });
+            }
+          }
         }
-      } catch (e) {
-        // Socket opcional
+      } catch (e: any) {
+        console.warn('[Socket.IO] Error emitting events:', e.message);
       }
 
       res.status(200).json({

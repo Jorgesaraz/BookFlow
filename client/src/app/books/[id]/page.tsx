@@ -90,9 +90,9 @@ export default function BookDetailPage() {
       }
     };
 
-    socket.on('book:stock_updated', handleStockUpdate);
+    socket.on('stock-updated', handleStockUpdate);
     return () => {
-      socket.off('book:stock_updated', handleStockUpdate);
+      socket.off('stock-updated', handleStockUpdate);
     };
   }, [socket, id]);
 

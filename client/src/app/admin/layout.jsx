@@ -20,7 +20,8 @@ export default function AdminLayout({ children }) {
   }
 
   // Protección de rol ADMIN
-  if (!user || !isAdmin) {
+  const isAuthorized = user?.role === 'ADMIN' || isAdmin;
+  if (!user || !isAuthorized) {
     return (
       <div className="max-w-md mx-auto py-24 px-4 text-center space-y-4">
         <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 mx-auto flex items-center justify-center">

@@ -2,6 +2,7 @@ import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { SocketProvider } from '../context/SocketContext';
+import type { Metadata } from 'next';
 import Navbar from '../components/common/Navbar';
 import Footer from '../components/common/Footer';
 

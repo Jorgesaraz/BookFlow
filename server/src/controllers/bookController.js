@@ -150,6 +150,11 @@ const createBook = async (req, res, next) => {
       availability: Number(stock) > 0
     });
 
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().emit('catalog-updated', { action: 'create', bookId: newBook._id.toString() });
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       data: newBook
@@ -210,6 +215,11 @@ const updateBook = async (req, res, next) => {
       });
     }
 
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().emit('catalog-updated', { action: 'update', bookId: updatedBook._id.toString() });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
       data: updatedBook
@@ -240,6 +250,11 @@ const deleteBook = async (req, res, next) => {
         message: 'Libro no encontrado.'
       });
     }
+
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().emit('catalog-updated', { action: 'delete', bookId: id });
+    } catch (e) {}
 
     res.status(200).json({
       success: true,

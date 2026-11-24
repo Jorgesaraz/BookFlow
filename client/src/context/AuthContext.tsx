@@ -15,6 +15,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  isAdmin: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
@@ -24,6 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
+  isAdmin: false,
   loading: true,
   login: async () => ({ success: false }),
   register: async () => ({ success: false }),
@@ -125,8 +127,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     router.push('/login');
   };
 
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isAdmin, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

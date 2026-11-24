@@ -164,6 +164,11 @@ export const createBook = async (req: Request, res: Response, next: NextFunction
       availability: Number(stock) > 0
     });
 
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().emit('catalog-updated', { action: 'create', bookId: newBook._id.toString() });
+    } catch (e) {}
+
     res.status(201).json({
       success: true,
       data: newBook
@@ -231,6 +236,11 @@ export const updateBook = async (req: Request, res: Response, next: NextFunction
       return;
     }
 
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().emit('catalog-updated', { action: 'update', bookId: updatedBook._id.toString() });
+    } catch (e) {}
+
     res.status(200).json({
       success: true,
       data: updatedBook
@@ -265,6 +275,11 @@ export const deleteBook = async (req: Request, res: Response, next: NextFunction
       });
       return;
     }
+
+    try {
+      const { getIO } = require('../socket/socket');
+      getIO().emit('catalog-updated', { action: 'delete', bookId: id });
+    } catch (e) {}
 
     res.status(200).json({
       success: true,

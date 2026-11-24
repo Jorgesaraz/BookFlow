@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProtectedRoute from '../../../components/ProtectedRoute';
 import api from '../../../lib/api';
+import { useSocket } from '../../../context/SocketContext';
 import {
   BookOpen,
   Plus,
@@ -68,12 +69,15 @@ export default function AdminBooksPage() {
   // Notificación tipo toast
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Socket.IO para auto-refresh del inventario
+  const { socket } = useSocket();
+
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
   };
 
-  const loadBooks = async () => {
+  const loadBooks = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/books');
@@ -86,11 +90,19 @@ export default function AdminBooksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadBooks();
-  }, []);
+  }, [loadBooks]);
+
+  // Listener de catalog-updated para auto-refresh del inventario admin
+  useEffect(() => {
+    if (!socket) return;
+    const handleCatalogUpdate = () => { loadBooks(); };
+    socket.on('catalog-updated', handleCatalogUpdate);
+    return () => { socket.off('catalog-updated', handleCatalogUpdate); };
+  }, [socket, loadBooks]);
 
   const handleOpenCreate = () => {
     setEditingBook(null);

@@ -1,6 +1,5 @@
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
 const cors = require('cors');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
@@ -9,7 +8,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const connectDB = require('./config/db');
-const { initSocket } = require('./config/socket');
+const { initSocket } = require('./socket/socket');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 
 // Conectar a la base de datos
@@ -41,14 +40,8 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// Inicializar Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE']
-  }
-});
-initSocket(io);
+// Inicializar Socket.IO vinculado al servidor HTTP compartido
+initSocket(server);
 
 // Ruta de estado general
 app.get('/', (req, res) => {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../lib/api';
 import BookCard, { BookItem } from '../components/BookCard';
+import { useSocket } from '../context/SocketContext';
 import {
   Search,
   SlidersHorizontal,
@@ -29,6 +30,9 @@ export default function HomePage() {
 
   // Toast temporal para Fase 5
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Socket.IO para actualizaciones en tiempo real
+  const { socket } = useSocket();
 
   // Consulta de libros con debounce o filtros
   const fetchBooks = useCallback(async () => {
@@ -78,6 +82,35 @@ export default function HomePage() {
     }, 250);
     return () => clearTimeout(timer);
   }, [fetchBooks]);
+
+  // ── Socket.IO: actualizar catálogo y stock en tiempo real ──────────────────
+  useEffect(() => {
+    if (!socket) return;
+
+    // Cuando el ADMIN crea/actualiza/elimina un libro → refrescar catálogo
+    const handleCatalogUpdate = () => {
+      fetchBooks();
+    };
+
+    // Cuando se completa una compra → actualizar stock en la lista sin refetch completo
+    const handleStockUpdate = (data: { bookId: string; stock: number; availability: boolean }) => {
+      setBooks((prev) =>
+        prev.map((b) =>
+          b._id === data.bookId
+            ? { ...b, stock: data.stock, availability: data.availability }
+            : b
+        )
+      );
+    };
+
+    socket.on('catalog-updated', handleCatalogUpdate);
+    socket.on('stock-updated', handleStockUpdate);
+
+    return () => {
+      socket.off('catalog-updated', handleCatalogUpdate);
+      socket.off('stock-updated', handleStockUpdate);
+    };
+  }, [socket, fetchBooks]);
 
   const handleResetFilters = () => {
     setSearchTerm('');
