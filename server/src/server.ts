@@ -7,10 +7,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import { initSocket } from './socket/socket';
-import authRoutes from './routes/authRoutes';
+import authRoutes from './routes/auth.routes';
 import bookRoutes from './routes/book.routes';
 import cartRoutes from './routes/cart.routes';
 import orderRoutes from './routes/order.routes';
+import reviewRoutes from './routes/review.routes';
 
 const app: Application = express();
 const server = http.createServer(app);
@@ -51,6 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 const PORT = process.env.PORT || 5000;
 

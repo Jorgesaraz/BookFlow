@@ -195,10 +195,72 @@ const addAddress = async (req, res, next) => {
   }
 };
 
+// @desc    Actualizar perfil del usuario (nombre y opcionalmente contraseña)
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfileEndpoint = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Usuario no autenticado.' });
+    }
+
+    const user = await User.findById(userId).select('+password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+    }
+
+    const { name, currentPassword, newPassword } = req.body;
+
+    if (name && name.trim()) {
+      user.name = name.trim();
+    }
+
+    if (currentPassword || newPassword) {
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: 'Para cambiar la contraseña debes proporcionar la contraseña actual y la nueva contraseña.'
+        });
+      }
+
+      const isMatch = await user.matchPassword(currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          message: 'La contraseña actual es incorrecta.'
+        });
+      }
+
+      if (!PASSWORD_REGEX.test(newPassword)) {
+        return res.status(400).json({
+          success: false,
+          message: 'La nueva contraseña debe tener al menos 8 caracteres, incluyendo una mayúscula, una minúscula y un número.'
+        });
+      }
+
+      user.password = newPassword;
+    }
+
+    await user.save();
+
+    const updatedUser = await User.findById(userId).select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'Perfil actualizado exitosamente.',
+      user: updatedUser
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
+  updateProfileEndpoint,
   adminCheck,
   addAddress
 };

@@ -4,6 +4,7 @@ const {
   registerUser,
   loginUser,
   getMe,
+  updateProfileEndpoint,
   adminCheck,
   addAddress
 } = require('../controllers/authController');
@@ -15,6 +16,7 @@ router.post('/login', loginUser);
 
 // Rutas protegidas para usuarios autenticados
 router.get('/me', authenticate, getMe);
+router.put('/profile', authenticate, updateProfileEndpoint);
 router.post('/addresses', authenticate, addAddress);
 
 // Ruta de prueba protegida con control de roles (RBAC: solo ADMIN)

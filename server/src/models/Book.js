@@ -44,6 +44,17 @@ const bookSchema = new mongoose.Schema(
     availability: {
       type: Boolean,
       default: true
+    },
+    averageRating: {
+      type: Number,
+      default: 0,
+      min: [0, 'El rating mínimo es 0'],
+      max: [5, 'El rating máximo es 5']
+    },
+    numReviews: {
+      type: Number,
+      default: 0,
+      min: [0, 'El número de reseñas no puede ser negativo']
     }
   },
   {

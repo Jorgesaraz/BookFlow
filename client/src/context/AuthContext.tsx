@@ -20,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
+  updateUser: (updatedUser: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,7 +30,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   login: async () => ({ success: false }),
   register: async () => ({ success: false }),
-  logout: () => {}
+  logout: () => {},
+  updateUser: () => {}
 });
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -127,10 +129,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     router.push('/login');
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   const isAdmin = user?.role === 'ADMIN';
 
   return (
-    <AuthContext.Provider value={{ user, token, isAdmin, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isAdmin, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

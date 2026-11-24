@@ -117,6 +117,15 @@ export default function Navbar() {
                   <span className="hidden sm:inline">Mis Compras</span>
                 </Link>
 
+                {/* Enlace Mi Perfil */}
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  <span className="hidden sm:inline">Mi Perfil</span>
+                </Link>
+
                 {/* Carrito */}
                 <Link
                   href="/cart"
@@ -258,6 +267,15 @@ export default function Navbar() {
                 >
                   <Package className="w-4 h-4" />
                   <span className="hidden sm:inline">Mis Compras</span>
+                </Link>
+
+                {/* Enlace Mi Perfil */}
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  <span className="hidden sm:inline">Mi Perfil</span>
                 </Link>
 
                 {/* Carrito con Badge */}

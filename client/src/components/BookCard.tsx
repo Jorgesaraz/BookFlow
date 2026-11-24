@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ShoppingCart, Eye, CheckCircle2, AlertCircle, BookOpen, Check, Loader2 } from 'lucide-react';
+import { ShoppingCart, Eye, CheckCircle2, AlertCircle, BookOpen, Check, Loader2, Star } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
 export interface BookItem {
@@ -15,6 +15,8 @@ export interface BookItem {
   stock: number;
   coverImage: string;
   availability: boolean;
+  averageRating?: number;
+  numReviews?: number;
 }
 
 interface BookCardProps {
@@ -97,6 +99,19 @@ export default function BookCard({ book, onAddToCartToast }: BookCardProps) {
             <Link href={`/books/${book._id}`}>{book.title}</Link>
           </h3>
           <p className="text-xs font-medium text-slate-500">Por {book.author}</p>
+
+          {/* Calificación con estrellas */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+            {book.numReviews && book.numReviews > 0 ? (
+              <span className="text-xs font-bold text-slate-800">
+                {(book.averageRating || 0).toFixed(1)}{' '}
+                <span className="text-slate-400 font-normal">({book.numReviews})</span>
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium text-slate-400">Sin reseñas</span>
+            )}
+          </div>
         </div>
 
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between">

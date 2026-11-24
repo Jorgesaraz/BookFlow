@@ -58,6 +58,7 @@ app.use('/api/books', require('./routes/bookRoutes'));
 app.use('/api/cart', require('./routes/cartRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
+app.use('/api/reviews', require('./routes/reviewRoutes'));
 
 // Manejo centralizado de errores
 app.use(notFound);
